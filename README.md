@@ -16,7 +16,8 @@ A **Retrieval-Augmented Generation (RAG)** chatbot that answers questions ground
 - **Demo Knowledge Base** — Pre-loaded with 8 company content chunks so it works instantly out of the box
 
 ---
-
+## Live demo
+Here is an interavtive UI (https://ragchatbot-lake.vercel.app)
 ## 🚀 Quick Start
 
 ### Option 1 — Run in Claude.ai (Instant)
