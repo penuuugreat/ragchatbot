@@ -110,38 +110,6 @@ User Query
 
 ---
 
-## 🗂️ Component Architecture
-
-```
-RAGChatbot (default export)
-│
-├── VectorStore (class)
-│   ├── tokenize()           Lowercase + strip punctuation + split
-│   ├── buildVocabulary()    Build word index across all docs
-│   ├── computeIDF()         Inverse document frequency weights
-│   ├── vectorize()          TF-IDF sparse vector for any text
-│   ├── cosineSimilarity()   Compare two sparse vectors
-│   ├── ingest()             Index a document set
-│   └── search()             Return top-K scored results
-│
-├── crawlUrl()               Fetch + parse + chunk a URL (async)
-├── chunkText()              Split text into overlapping windows
-├── callClaude()             SSE streaming call to Anthropic API
-│
-└── UI Components (inline)
-    ├── Sidebar              Tabs: Chat | Sources | Debug
-    │   ├── Chat Tab         Stats + suggested questions
-    │   ├── Sources Tab      URL textarea + crawl progress + source list
-    │   └── Debug Tab        Retrieved chunks + similarity scores + pipeline
-    └── Chat Main
-        ├── Header           Title + chunk count + clear button
-        ├── Message List     User + assistant bubbles with markdown
-        ├── Streaming View   Live token output + typing dots
-        └── Input Bar        Textarea + send button + context bar
-```
-
----
-
 ## 🎛️ State Management
 
 All state is managed locally with React hooks:
