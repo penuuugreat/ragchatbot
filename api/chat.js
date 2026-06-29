@@ -1,14 +1,3 @@
-/**
- * api/chat.js  —  Vercel Edge Function
- *
- * Proxies requests to the Anthropic Messages API so the API key never
- * reaches the browser.  Set ANTHROPIC_API_KEY in your Vercel project's
- * Environment Variables (not in .env.local — that file is client-side
- * when used with VITE_* prefix).
- *
- * Usage from the frontend:
- *   POST /api/chat   { model, max_tokens, system, messages, stream }
- */
 
 export const config = { runtime: "edge" };
 
