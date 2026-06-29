@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+// ============================================================
+// RAG PIPELINE ENGINE
+// All logic runs client-side using Claude API for embeddings + generation
+// ============================================================
+
+// --- Simple TF-IDF Vector Store (no external deps needed) ---
 class VectorStore {
   constructor() {
     this.documents = [];
@@ -89,7 +95,9 @@ class VectorStore {
   }
 }
 
-
+// --- Web Crawler / Content Ingestion ---
+// Multi-proxy fallback: tries each CORS proxy in order until one works.
+// allorigins.win is unreliable (rate limits, downtime), so we cascade.
 const CORS_PROXIES = [
   (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
@@ -115,6 +123,27 @@ async function fetchViaProxy(url) {
 
 async function crawlUrl(url) {
   try {
+    // Wikipedia special case — use their open API directly (no proxy needed)
+    const wikiMatch = url.match(/wikipedia\.org\/wiki\/(.+)/);
+    if (wikiMatch) {
+      const title = wikiMatch[1];
+      const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${title}&prop=extracts&explaintext=true&format=json&origin=*`;
+      const res = await fetch(apiUrl);
+      const data = await res.json();
+      const pages = data.query.pages;
+      const page = pages[Object.keys(pages)[0]];
+      const text = page.extract || "";
+      const chunks = chunkText(text.replace(/\s+/g, " ").trim(), 600, 100);
+      return chunks.map((chunk, i) => ({
+        id: `${url}#chunk${i}`,
+        url,
+        title: page.title,
+        content: chunk,
+        chunkIndex: i,
+      }));
+    }
+
+    // All other URLs — fall through to CORS proxy
     const html = await fetchViaProxy(url);
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
@@ -155,7 +184,9 @@ function chunkText(text, chunkSize = 600, overlap = 100) {
   return chunks;
 }
 
-
+// --- Claude API Integration ---
+// Routes through /api/chat (Vercel serverless function) so the API key
+// stays server-side and never appears in the browser bundle.
 async function callClaude(messages, systemPrompt, onStream) {
   const response = await fetch("/api/chat", {
     method: "POST",
@@ -193,6 +224,9 @@ async function callClaude(messages, systemPrompt, onStream) {
   return fullText;
 }
 
+// ============================================================
+// DEFAULT DEMO KNOWLEDGE BASE
+// ============================================================
 const DEMO_KNOWLEDGE = [
   {
     id: "demo1",
@@ -260,6 +294,9 @@ const DEMO_KNOWLEDGE = [
   },
 ];
 
+// ============================================================
+// MAIN APP
+// ============================================================
 export default function RAGChatbot() {
   const [phase, setPhase] = useState("setup"); // setup | ingesting | ready | chatting
   const [urls, setUrls] = useState("");
@@ -757,7 +794,9 @@ ${context}`;
   );
 }
 
-
+// ============================================================
+// STYLES
+// ============================================================
 const styles = {
   root: {
     width: "100vw",
