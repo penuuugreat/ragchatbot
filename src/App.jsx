@@ -155,9 +155,7 @@ function chunkText(text, chunkSize = 600, overlap = 100) {
   return chunks;
 }
 
-// --- Claude API Integration ---
-// Routes through /api/chat (Vercel serverless function) so the API key
-// stays server-side and never appears in the browser bundle.
+
 async function callClaude(messages, systemPrompt, onStream) {
   const response = await fetch("/api/chat", {
     method: "POST",
