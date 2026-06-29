@@ -1,7 +1,7 @@
 
 export const config = { runtime: "edge" };
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
+const OPENAI_API_KEY = "https://api.openai.com/v1/chat/completions";
 
 export default async function handler(req) {
   // Only allow POST
@@ -12,7 +12,7 @@ export default async function handler(req) {
     });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(
       JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured on the server." }),
@@ -31,22 +31,20 @@ export default async function handler(req) {
   }
 
   // Forward to Anthropic, streaming if requested
-  const upstream = await fetch(ANTHROPIC_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: body.model ?? "claude-sonnet-4-6",
-      max_tokens: body.max_tokens ?? 1000,
-      system: body.system,
-      messages: body.messages,
-      stream: body.stream ?? false,
-    }),
-  });
-
+  const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
+  headers: {
+    "Authorization": `Bearer ${apiKey}`,
+  },
+  body: JSON.stringify({
+    model: "gpt-4o-mini",  // cheap, fast — good for portfolio
+    max_tokens: 1000,
+    messages: [
+      { role: "system", content: body.system },
+      ...body.messages,
+    ],
+    stream: true,
+  }),
+});
   // Stream the response straight back to the browser
   return new Response(upstream.body, {
     status: upstream.status,
