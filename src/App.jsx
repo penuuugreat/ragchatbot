@@ -1,11 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ============================================================
-// RAG PIPELINE ENGINE
-// All logic runs client-side using Claude API for embeddings + generation
-// ============================================================
-
-// --- Simple TF-IDF Vector Store (no external deps needed) ---
 class VectorStore {
   constructor() {
     this.documents = [];
@@ -95,29 +89,47 @@ class VectorStore {
   }
 }
 
-// --- Web Crawler / Content Ingestion ---
-async function crawlUrl(url) {
-  // In a real deployment, this would call a backend crawler.
-  // Here we use a CORS proxy approach and parse the HTML client-side.
-  try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl);
-    const data = await res.json();
-    if (!data.contents) throw new Error("No content");
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(data.contents, "text/html");
 
-    // Remove noise
+const CORS_PROXIES = [
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+];
+
+async function fetchViaProxy(url) {
+  for (const makeProxy of CORS_PROXIES) {
+    try {
+      const proxyUrl = makeProxy(url);
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const data = await res.json().catch(() => null);
+      // allorigins wraps in { contents }, corsproxy.io returns raw text
+      const html = data?.contents ?? (typeof data === "string" ? data : null) ?? await res.text().catch(() => null);
+      if (html && html.length > 200) return html;
+    } catch (_) {
+      // try next proxy
+    }
+  }
+  throw new Error("All CORS proxies failed for " + url);
+}
+
+async function crawlUrl(url) {
+  try {
+    const html = await fetchViaProxy(url);
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+
+    // Remove noise elements
     ["script", "style", "nav", "footer", "header", "noscript", "iframe"].forEach((tag) => {
       doc.querySelectorAll(tag).forEach((el) => el.remove());
     });
 
     const title = doc.querySelector("title")?.textContent?.trim() || url;
     const body = doc.querySelector("main, article, .content, #content, body");
-    const text = body?.innerText || doc.body?.textContent || "";
+    // NOTE: DOMParser has no layout engine so innerText is undefined — use textContent
+    const text = body?.textContent || doc.body?.textContent || "";
 
-    // Chunk the content
-    const chunks = chunkText(text, 600, 100);
+    const chunks = chunkText(text.replace(/\s+/g, " ").trim(), 600, 100);
     return chunks.map((chunk, i) => ({
       id: `${url}#chunk${i}`,
       url,
@@ -144,17 +156,14 @@ function chunkText(text, chunkSize = 600, overlap = 100) {
 }
 
 // --- Claude API Integration ---
+// Routes through /api/chat (Vercel serverless function) so the API key
+// stays server-side and never appears in the browser bundle.
 async function callClaude(messages, systemPrompt, onStream) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("/api/chat", {
     method: "POST",
-    headers: { 
-      "Content-Type": "application/json" 
-      "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1000,
       system: systemPrompt,
       messages,
@@ -186,9 +195,6 @@ async function callClaude(messages, systemPrompt, onStream) {
   return fullText;
 }
 
-// ============================================================
-// DEFAULT DEMO KNOWLEDGE BASE
-// ============================================================
 const DEMO_KNOWLEDGE = [
   {
     id: "demo1",
@@ -256,9 +262,6 @@ const DEMO_KNOWLEDGE = [
   },
 ];
 
-// ============================================================
-// MAIN APP
-// ============================================================
 export default function RAGChatbot() {
   const [phase, setPhase] = useState("setup"); // setup | ingesting | ready | chatting
   const [urls, setUrls] = useState("");
@@ -543,7 +546,7 @@ ${context}`;
                                 : "#fbbf24",
                           }}
                         >
-                          {p.status === "done" ? `✓ ${p.chunks} chunks` : p.status === "failed" ? "✗ failed" : "⟳ crawling"}
+                          {p.status === "done" ? `✓ ${p.chunks} chunks` : p.status === "failed" ? "✗ CORS blocked — try a public URL" : "⟳ crawling"}
                         </span>
                       </div>
                     ))}
@@ -756,9 +759,7 @@ ${context}`;
   );
 }
 
-// ============================================================
-// STYLES
-// ============================================================
+
 const styles = {
   root: {
     width: "100vw",
