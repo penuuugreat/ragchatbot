@@ -177,39 +177,50 @@ function chunkText(text, chunkSize = 600, overlap = 100) {
 }
 
 
-async function callClaude(messages, systemPrompt, onStream) {
+async function callNvidia(messages, systemPrompt, onStream) {
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
       system: systemPrompt,
       messages,
-      stream: true,
     }),
   });
 
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || `API error: ${response.status}`);
+  }
+  if (!response.body) throw new Error("NVIDIA API returned an empty response.");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value);
-    const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    if (done && buffer) lines.push(buffer);
+
     for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6).trim();
+      if (data === "[DONE]") continue;
       try {
-        const json = JSON.parse(line.slice(6));
-        if (json.type === "content_block_delta" && json.delta?.text) {
-          fullText += json.delta.text;
+        const json = JSON.parse(data);
+        const content = json.choices?.[0]?.delta?.content;
+        if (typeof content === "string" && content) {
+          fullText += content;
           onStream?.(fullText);
         }
-      } catch {}
+      } catch (error) {
+        console.error("Could not parse NVIDIA stream response:", error);
+      }
     }
+    if (done) break;
   }
   return fullText;
 }
@@ -404,7 +415,7 @@ ${context}`;
       .map((m) => ({ role: m.role, content: m.content }));
 
     try {
-      const fullResponse = await callClaude(
+      const fullResponse = await callNvidia(
         apiMessages,
         systemPrompt,
         (partial) => setStreamText(partial)
@@ -475,7 +486,7 @@ ${context}`;
               </div>
               <div>
                 <div style={styles.logoName}>RAG Chat</div>
-                <div style={styles.logoSub}>Powered by Claude</div>
+                <div style={styles.logoSub}>Powered by NVIDIA</div>
               </div>
             </div>
           </div>
@@ -614,7 +625,7 @@ ${context}`;
                     ["3. Index", "TF-IDF vector store built in-memory"],
                     ["4. Retrieve", "Cosine similarity top-5 search"],
                     ["5. Augment", "Inject context into system prompt"],
-                    ["6. Generate", "Claude streams grounded response"],
+                    ["6. Generate", "NVIDIA streams grounded response"],
                   ].map(([step, desc]) => (
                     <div key={step} style={styles.pipelineStep}>
                       <span style={styles.pipelineLabel}>{step}</span>
