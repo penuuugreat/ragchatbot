@@ -43,7 +43,7 @@ npm run dev
 # Opens at http://localhost:5173
 ```
 
-Set `NVIDIA_API_KEY` in your server/deployment environment (for example, Vercel Project Settings → Environment Variables). The key is used only by the server-side `/api/chat` endpoint; do not put it in client-side code. Optionally set `NVIDIA_MODEL`; the default is `meta/llama-3.3-70b-instruct`.
+Set `NVIDIA_API_KEY` in your server/deployment environment (for example, Vercel Project Settings → Environment Variables). The key is used only by the server-side `/api/chat` endpoint; do not put it in client-side code. Optionally set `NVIDIA_MODEL`; the default is `mistral-large-4`.
 
 To use the chat API locally, run the app with Vercel's development server (`vercel dev`) instead of `npm run dev`; Vite alone does not run the `/api` serverless function.
 
