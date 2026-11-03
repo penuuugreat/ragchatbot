@@ -1,6 +1,6 @@
-# 🤖 RAG Chatbot — Powered by Claude
+# 🤖 RAG Chatbot — Powered by NVIDIA
 
-A **Retrieval-Augmented Generation (RAG)** chatbot that answers questions grounded exclusively in your website content. Built as a self-contained React component using the Anthropic Claude API with a TF-IDF vector store, real-time streaming responses, and a built-in web crawler.
+A **Retrieval-Augmented Generation (RAG)** chatbot that answers questions grounded exclusively in your website content. Built as a self-contained React component using the NVIDIA API with a TF-IDF vector store, real-time streaming responses, and a built-in web crawler.
 
 ---
 
@@ -9,8 +9,8 @@ A **Retrieval-Augmented Generation (RAG)** chatbot that answers questions ground
 - **Full RAG Pipeline** — Crawl → Chunk → Index → Retrieve → Augment → Generate, all in one component
 - **Web Crawler** — Fetches any public URL via CORS proxy, strips nav/footer noise, and extracts clean body text
 - **TF-IDF Vector Store** — In-memory index with IDF weighting and cosine similarity search (no external vector DB required)
-- **Semantic Retrieval** — Top-5 chunk retrieval per query, injected into Claude's system prompt as grounded context
-- **Claude Streaming** — Real-time token-by-token streaming responses via Anthropic's SSE API
+- **Semantic Retrieval** — Top-5 chunk retrieval per query, injected into NVIDIA's model prompt as grounded context
+- **NVIDIA Streaming** — Real-time token-by-token streaming responses via NVIDIA's OpenAI-compatible API
 - **Grounded-Only Answers** — Strict system prompt prevents hallucination and blocks competitor mentions
 - **3-Tab Sidebar** — Chat stats, Sources (URL ingestion), and Debug (retrieved chunks + pipeline diagram)
 - **Demo Knowledge Base** — Pre-loaded with 8 company content chunks so it works instantly out of the box
@@ -42,6 +42,10 @@ Replace `src/App.jsx` with the contents of `rag-chatbot.jsx`, then:
 npm run dev
 # Opens at http://localhost:5173
 ```
+
+Set `NVIDIA_API_KEY` in your server/deployment environment (for example, Vercel Project Settings → Environment Variables). The key is used only by the server-side `/api/chat` endpoint; do not put it in client-side code. Optionally set `NVIDIA_MODEL`; the default is `meta/llama-3.3-70b-instruct`.
+
+To use the chat API locally, run the app with Vercel's development server (`vercel dev`) instead of `npm run dev`; Vite alone does not run the `/api` serverless function.
 
 ### Option 3 — Create React App
 
@@ -90,12 +94,12 @@ User Query
        │
     ▼
 ┌─────────────┐
-│  5. Augment │  Inject retrieved chunks into Claude's system prompt as context
+│  5. Augment │  Inject retrieved chunks into NVIDIA's model prompt as context
 └──────┬──────┘
        │
     ▼
 ┌─────────────┐
-│  6. Generate│  Claude streams a grounded, context-only response
+│  6. Generate│  NVIDIA streams a grounded, context-only response
 └─────────────┘
 ```
 
@@ -122,7 +126,7 @@ All state is managed locally with React hooks:
 | `docCount`         | number     | Total number of indexed chunks                 |
 | `messages`         | Message[]  | Full conversation history                      |
 | `input`            | string     | Current textarea value                         |
-| `isTyping`         | boolean    | Whether Claude is streaming a response         |
+| `isTyping`         | boolean    | Whether NVIDIA is streaming a response         |
 | `streamText`       | string     | Partial streamed text during generation        |
 | `retrievedChunks`  | Chunk[]    | Last retrieval result (shown in Debug tab)     |
 | `ingestProgress`   | Progress[] | Per-URL crawl status                           |
@@ -218,8 +222,8 @@ const results = await index.query({ vector: embedding, topK: 5 })
 ### Move API Key to Backend
 
 ```js
-// Current: direct browser call (exposes API key)
-fetch('https://api.anthropic.com/v1/messages', { ... })
+// Current: NVIDIA API key stays on the server
+fetch('/api/chat', { method: 'POST', body: JSON.stringify({ messages, context }) })
 
 // Production: proxy through your backend
 fetch('/api/chat', { method: 'POST', body: JSON.stringify({ messages, context }) })
@@ -265,7 +269,7 @@ Once loaded, ask things like:
 |--------------------|----------|--------------------------------------|
 | `react`            | ^18.2    | UI framework                         |
 | `react-dom`        | ^18.2    | DOM rendering                        |
-| Anthropic API      | —        | Claude Sonnet streaming responses    |
+| NVIDIA API         | —        | Streaming chat completions           |
 | allorigins.win     | —        | CORS proxy for client-side crawling  |
 | Space Grotesk      | Google Fonts | UI typography                   |
 | JetBrains Mono     | Google Fonts | Code/monospace elements         |
@@ -282,6 +286,6 @@ MIT — free to use, modify, and deploy.
 
 ## 🙏 Built With
 
-- [Anthropic Claude](https://www.anthropic.com) — `claude-sonnet-4-20250514` for streaming generation
+- [NVIDIA API](https://build.nvidia.com/) — OpenAI-compatible streaming chat completions
 - [React](https://react.dev) — UI framework
 - [allorigins.win](https://allorigins.win) — Open CORS proxy for client-side crawling
