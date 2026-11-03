@@ -49,7 +49,7 @@ export default async function handler(req) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct",
+        model: process.env.NVIDIA_MODEL || "mistral-large-4",
         max_tokens: 1000,
         messages: [{ role: "system", content: body.system }, ...body.messages],
         stream: true,
