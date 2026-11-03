@@ -1,19 +1,22 @@
 export const config = { runtime: "edge" };
 
+function jsonResponse(body, status) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export default async function handler(req) {
-  // Only allow POST
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "OPENAI_API_KEY is not configured on the server." }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+    return jsonResponse(
+      { error: "NVIDIA_API_KEY is not configured on the server." },
+      500
     );
   }
 
@@ -21,36 +24,46 @@ export default async function handler(req) {
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
-  // Forward to OpenAI, streaming
-  const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      max_tokens: 1000,
-      messages: [
-        { role: "system", content: body.system },
-        ...body.messages,
-      ],
-      stream: true,
-    }),
-  });
+  if (
+    typeof body.system !== "string" ||
+    !Array.isArray(body.messages) ||
+    body.messages.some(
+      (message) =>
+        !message ||
+        !["user", "assistant"].includes(message.role) ||
+        typeof message.content !== "string"
+    )
+  ) {
+    return jsonResponse({ error: "Invalid chat request" }, 400);
+  }
 
-  // Stream the response straight back to the browser
+  let upstream;
+  try {
+    upstream = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct",
+        max_tokens: 1000,
+        messages: [{ role: "system", content: body.system }, ...body.messages],
+        stream: true,
+      }),
+    });
+  } catch (error) {
+    console.error("NVIDIA API request failed:", error);
+    return jsonResponse({ error: "Unable to connect to the NVIDIA API." }, 502);
+  }
+
   return new Response(upstream.body, {
     status: upstream.status,
     headers: {
       "Content-Type": upstream.headers.get("Content-Type") ?? "application/json",
-      "Access-Control-Allow-Origin": "*",
     },
   });
 }
